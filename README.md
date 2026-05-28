@@ -150,5 +150,8 @@ _Graduate Course: Real-Time Data Analytics for IoT · Module 1_
 
 For this submission, AMQP was intentionally ignored based on the instructor’s instruction: “PLEASE IGNORE AMQP as we will skip it this time.” Therefore, this project focuses on MQTT, CoAP, packet analysis, and the protocol comparison report.
 
+Student Name: Bayan Sayyadifar
+Student ID: 101035809
+
 GitHub repository link:
 https://github.com/sayadifarbayan-lgtm/smartfactory-iot-protocol-integration
