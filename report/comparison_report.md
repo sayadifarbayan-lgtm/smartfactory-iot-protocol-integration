@@ -37,18 +37,9 @@
 
 ## 5.2 CoAP–HTTP Proxy Mapping
 
-Not applicable. The provided repository did not include tests/coap/test_proxy.py, therefore CoAP–HTTP proxy mapping could not be evaluated.
+This section was not evaluated because the provided repository did not include tests/coap/test_proxy.py. When I attempted to run the proxy test, pytest returned that the file or directory was not found. Therefore, no HTTP response headers were available to map to CoAP options.
 
-> Run `pytest tests/coap/test_proxy.py -v -s` and record the observed HTTP headers.
-
-| HTTP Header            | CoAP Option | Your Observed Value |
-| ---------------------- | ----------- | ------------------- |
-| Content-Type           |             |                     |
-| Cache-Control: max-age |             |                     |
-| ETag                   |             |                     |
-| Location               |             |                     |
-
----
+AMQP was also excluded based on the assignment instruction to ignore AMQP for this version.
 
 ## 5.3 Protocol Selection Recommendation
 
@@ -56,28 +47,24 @@ _(500–700 words. Justify each recommendation with specific technical evidence 
 
 ### Data Path Recommendations
 
-| Data Path                                          | Recommended Protocol | Justification                                                                                                                                |
-| -------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sensor → Cloud (high frequency, <100 ms latency)   | MQTT QoS 0           | Lowest latency (0.9 ms average) and minimal protocol overhead. Suitable for continuous telemetry where occasional packet loss is acceptable. |
-| Actuator commands (safety-critical, exactly-once)  | MQTT QoS 2           | Guarantees exactly-once delivery through a four-step handshake, preventing duplicate or lost commands.                                       |
-| Backend service-to-service routing                 | AMQP                 | Provides advanced routing, queues, exchanges, and reliable message delivery between backend services.                                        |
-| OTA firmware delivery to constrained MCU (Class 2) | CoAP                 | Lightweight protocol designed for constrained devices and supports efficient block-wise transfers for large firmware images.                 |
+| Data Path                                          | Recommended Protocol         | Justification                                                                                                                                                         |
+| -------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sensor → Cloud (high frequency, <100 ms latency)   | MQTT QoS 0 or QoS 1          | MQTT had very low latency in my test results. QoS 0 had the lowest average latency at 0.9 ms, while QoS 1 was only slightly higher at 1.0 ms and adds acknowledgment. |
+| Actuator commands (safety-critical, exactly-once)  | MQTT QoS 2                   | QoS 2 had higher latency at 3.3 ms, but it provides the strongest delivery guarantee using the PUBREC, PUBREL, and PUBCOMP exchange.                                  |
+| Backend service-to-service routing                 | Not evaluated / AMQP ignored | AMQP would normally be suitable for backend routing, but it was not implemented or analyzed because the assignment instruction said to ignore AMQP.                   |
+| OTA firmware delivery to constrained MCU (Class 2) | CoAP                         | CoAP is lightweight and supports block-wise transfer, which fits constrained devices and larger payloads such as firmware manifests.                                  |
 
 ### Detailed Justification
 
-Different IoT communication paths have different requirements regarding reliability, latency, bandwidth consumption, and implementation complexity. Based on the implementation, testing, and packet analysis performed in this assignment, different protocols are better suited for different use cases.
+Based on my implementation and packet captures, MQTT is the best fit for the high-frequency sensor telemetry part of this system. In the QoS experiment, MQTT QoS 0 delivered 100 out of 100 messages with an average latency of 0.9 ms. QoS 1 also delivered 100 out of 100 messages with an average latency of 1.0 ms. Since the difference was very small, I would choose QoS 0 for non-critical high-frequency readings where the newest value matters more than every single individual message. However, for temperature data that may trigger alerts, QoS 1 is a safer choice because it still keeps latency low while adding acknowledgment through PUBACK.
 
-For high-frequency sensor-to-cloud telemetry, MQTT QoS 0 is the most appropriate choice. The QoS comparison experiment showed an average latency of approximately 0.9 ms, which was the lowest among all tested MQTT QoS levels. QoS 0 minimizes protocol overhead because it does not require acknowledgments or retransmissions. In many industrial monitoring applications, occasional packet loss is acceptable because new sensor readings are continuously generated. The packet capture also showed a relatively simple frame structure, reducing bandwidth consumption.
+For actuator commands, I would choose MQTT QoS 2. In my results, QoS 2 had the highest latency at 3.3 ms, but the extra overhead is reasonable for commands that should not be lost or duplicated. In Wireshark, QoS 2 traffic showed the extra handshake messages such as PUBREC, PUBREL, and PUBCOMP. This makes the protocol slower than QoS 0 and QoS 1, but it provides stronger delivery semantics. For a cooling fan or another safety-related actuator, reliability is more important than saving a few milliseconds.
 
-For safety-critical actuator commands, MQTT QoS 2 is the preferred option. Although the measured latency increased to approximately 3.3 ms, QoS 2 guarantees exactly-once delivery. Packet captures demonstrated the additional PUBREC, PUBREL, and PUBCOMP handshake messages that eliminate duplicate delivery. This additional overhead is justified when controlling industrial equipment, where duplicate commands could create safety risks or unintended system behavior.
+For backend service-to-service routing, I would normally consider AMQP because it supports exchanges, queues, routing keys, acknowledgments, and durable messaging. However, AMQP was not implemented in this assignment because the instruction said to ignore it. Therefore, I did not use AMQP packet captures or test results as evidence. Within the implemented scope, MQTT topic routing already worked well for organizing telemetry by production line and sensor type, such as `factory/line1/temperature`.
 
-Backend service-to-service communication is best handled by AMQP. Although the AMQP analysis section was excluded in this assignment version, AMQP is specifically designed for enterprise messaging environments. It supports exchanges, routing keys, queues, acknowledgments, and flexible message routing. These features make it more suitable than MQTT for complex backend workflows where messages may need to be routed to multiple services or stored temporarily.
+For OTA firmware delivery to a constrained MCU, I would choose CoAP. In my CoAP implementation, the server exposed resources such as `/factory/line1/temperature` and `/factory/manifest`, and the observer client received live temperature updates. CoAP also handled the large firmware manifest response, which was around 19 KB in my run, using block-wise transfer. This is important because constrained devices often cannot receive large payloads in one packet. CoAP’s compact binary header, token matching, confirmable messages, and Observe option make it suitable for resource-constrained IoT devices.
 
-For over-the-air (OTA) firmware delivery to constrained microcontrollers, CoAP is the recommended protocol. During packet analysis, CoAP demonstrated efficient operation using compact binary headers and support for block-wise transfers. The CoAP Observe mechanism also provides an efficient method for receiving updates without repeatedly polling the server. The protocol is specifically optimized for resource-constrained devices with limited memory and bandwidth. Compared to HTTP, CoAP significantly reduces packet overhead while preserving reliability through confirmable (CON) messages.
-
-The packet captures further highlighted the differences between the protocols. MQTT packets included protocol-specific fields such as topic names, packet identifiers, and QoS information. CoAP packets used compact headers, tokens, and options, resulting in significantly smaller message sizes. These observations support selecting MQTT for telemetry streaming and CoAP for constrained-device communication.
-
-Overall, the results demonstrate that no single protocol is optimal for all IoT scenarios. MQTT provides excellent telemetry performance, CoAP offers lightweight communication for constrained devices, and AMQP provides powerful backend messaging capabilities. Selecting the appropriate protocol depends on the reliability, latency, and resource requirements of the specific communication path.
+Overall, my recommendation is to use MQTT for live telemetry, MQTT QoS 2 for critical actuator commands, and CoAP for constrained-device resource access and firmware delivery. AMQP was not evaluated because it was excluded from this assignment version.
 
 ---
 
@@ -85,15 +72,15 @@ Overall, the results demonstrate that no single protocol is optimal for all IoT 
 
 ### Technical Challenge
 
-One of the main technical challenges encountered during this assignment was configuring and troubleshooting the MQTT and CoAP environments. Initially, some tests failed because services were not running or the correct Python virtual environment was not activated. Additionally, packet captures required multiple attempts to ensure that the correct protocol traffic was recorded. These issues were resolved by carefully verifying service status, activating the virtual environment correctly, and repeating packet captures until the required protocol frames were visible in Wireshark.
+One technical challenge I experienced was getting the environment and tests to work correctly on Windows. At first, some commands did not run because the virtual environment was not activated, and PowerShell blocked script execution. I fixed this by using `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` before activating `.venv`. I also ran into CoAP issues related to the loopback address and port binding. The CoAP server worked manually, but the tests initially failed until I adjusted the binding and event loop setup. After that, the CoAP tests passed successfully.
 
 ### Most Surprising Protocol Difference
 
-The most surprising difference observed during packet analysis was the amount of additional communication required by higher MQTT QoS levels. Although QoS 0, QoS 1, and QoS 2 all delivered messages successfully in the experiment, QoS 2 required significantly more protocol exchanges. The packet captures clearly showed additional acknowledgment packets that were not present in QoS 0 communication. This demonstrated how stronger delivery guarantees directly increase protocol overhead and latency.
+The most surprising difference I observed was how much the protocol behavior changed depending on reliability level. MQTT QoS 0 was very simple and fast, while QoS 2 required several extra packets to complete one delivery. In Wireshark, I could clearly see the difference between a normal PUBLISH/PUBACK exchange and the longer QoS 2 flow with PUBREC, PUBREL, and PUBCOMP. This made the trade-off between latency and reliability much more obvious than just reading about QoS levels.
 
 ### Most Complex Protocol to Implement
 
-The most complex protocol to implement correctly was CoAP. Unlike MQTT, which follows a publish-subscribe model and provides relatively straightforward client APIs, CoAP required understanding confirmable messages, acknowledgments, tokens, Observe relationships, and resource-oriented communication. The Observe functionality was particularly challenging because it involved maintaining subscriptions and processing asynchronous notifications. Understanding the relationship between requests, acknowledgments, and notifications required careful packet analysis and testing. However, implementing these features provided valuable insight into how lightweight IoT protocols achieve reliable communication while minimizing network overhead.
+The most complex protocol for me was CoAP. MQTT was easier to understand because the publisher and subscriber model was straightforward: publish to topics and subscribe with wildcards. CoAP required more attention to request/response behavior, tokens, confirmable messages, Observe notifications, and block-wise transfer. The observer client was especially tricky because it had to receive updates asynchronously, track sequence numbers, deregister after 60 seconds, and then fetch the manifest. Once I captured the packets in Wireshark, the relationship between GET requests, ACK responses, Observe sequence numbers, and payloads became clearer.
 
 ---
 
