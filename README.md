@@ -109,13 +109,13 @@ pytest tests/mqtt/test_qos_loss.py -v -s
 
 ## Infrastructure
 
-| Service | Port | URL |
-|---------|------|-----|
-| Mosquitto MQTT | 1883 | mqtt://localhost:1883 |
-| RabbitMQ AMQP | 5672 | amqp://localhost:5672 |
-| RabbitMQ Management | 15672 | http://localhost:15672 (guest/guest) |
-| CoAP server (Python) | 5683 | coap://localhost:5683 |
-| InfluxDB (optional) | 8086 | http://localhost:8086 |
+| Service              | Port  | URL                                  |
+| -------------------- | ----- | ------------------------------------ |
+| Mosquitto MQTT       | 1883  | mqtt://localhost:1883                |
+| RabbitMQ AMQP        | 5672  | amqp://localhost:5672                |
+| RabbitMQ Management  | 15672 | http://localhost:15672 (guest/guest) |
+| CoAP server (Python) | 5683  | coap://localhost:5683                |
+| InfluxDB (optional)  | 8086  | http://localhost:8086                |
 
 ```bash
 # Start all services
@@ -144,4 +144,11 @@ Before zipping and submitting:
 
 ---
 
-*Graduate Course: Real-Time Data Analytics for IoT · Module 1*
+_Graduate Course: Real-Time Data Analytics for IoT · Module 1_
+
+## Submission Note
+
+For this submission, AMQP was intentionally ignored based on the instructor’s instruction: “PLEASE IGNORE AMQP as we will skip it this time.” Therefore, this project focuses on MQTT, CoAP, packet analysis, and the protocol comparison report.
+
+GitHub repository link:
+https://github.com/sayadifarbayan-lgtm/smartfactory-iot-protocol-integration
